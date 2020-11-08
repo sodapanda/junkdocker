@@ -1,0 +1,1 @@
+sudo docker image rm sodapanda/portforward:0.0.1
