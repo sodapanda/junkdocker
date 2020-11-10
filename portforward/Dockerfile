@@ -6,6 +6,7 @@ RUN yes | pacman -S iproute2
 RUN mkdir app
 COPY entrypoint.sh /app
 COPY gost /app
+COPY portmonitor /app
 EXPOSE 8800
 WORKDIR /app
 ENTRYPOINT ["./entrypoint.sh"]
