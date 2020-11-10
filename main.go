@@ -2,11 +2,26 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
 	docker "github.com/fsouza/go-dockerclient"
 )
 
 func main() {
+	httpServer()
+}
+
+func httpServer() {
+	http.HandleFunc("/bandwidthReport", ReportBandWidth)
+	http.ListenAndServe(":1030", nil)
+}
+
+//ReportBandWidth 带宽使用记录
+func ReportBandWidth(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r)
+}
+
+func testDocker() {
 	client, err := docker.NewClientFromEnv()
 	if err != nil {
 		panic(err)
