@@ -41,6 +41,9 @@ func httpServer() {
 	http.HandleFunc("/start", StartContainer)
 	//获取数据量
 	http.HandleFunc("/getTxBytes", GetBytesInTime)
+	//关闭一个容器
+	http.HandleFunc("/stop", StopContainer)
+
 	http.ListenAndServe(":1030", nil)
 }
 
@@ -118,6 +121,18 @@ func GetBytesInTime(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	fmt.Fprintf(w, "{\"cid\":\"%s\",\"start\":\"%d\",\"end\":\"%d\",\"txBytes\":\"%d\"}", cid, startTs, endTs, total)
+}
+
+func StopContainer(w http.ResponseWriter, r *http.Request) {
+	cid := getQueryParam(r, "cid")
+
+	err := dockerClient.StopContainer(cid, 2) //容器是不是需要响应一下信号，安全的关闭，也可以安全的重启
+	if err != nil {
+		fmt.Fprintf(w, "{\"ok\":false,\"msg\":\"%s\"}", err.Error())
+		return
+	}
+
+	fmt.Fprintf(w, "{\"ok\":true}")
 }
 
 func getQueryParam(r *http.Request, queryKey string) string {
