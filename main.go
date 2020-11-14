@@ -49,6 +49,7 @@ func ReportBandWidth(w http.ResponseWriter, r *http.Request) {
 	checkErr(err)
 
 	writeDBBandwidth(cid, timeStamp, txBytes)
+	fmt.Fprintf(w, "{\"ok\":%s}", "true")
 }
 
 //StartContainer start
@@ -61,6 +62,7 @@ func StartContainer(w http.ResponseWriter, r *http.Request) {
 	//container名称
 	ctnrName := fmt.Sprintf("%s_%s", uid, strings.Replace(dst, ":", "_", -1))
 
+	//创建container
 	container, err := dockerClient.CreateContainer(docker.CreateContainerOptions{
 		Name: ctnrName,
 		Config: &docker.Config{
@@ -75,29 +77,17 @@ func StartContainer(w http.ResponseWriter, r *http.Request) {
 	checkErr(err)
 	log.Printf("created %s %s\n", container.Name, container.ID)
 
+	//启动container
 	err = dockerClient.StartContainer(container.ID, nil)
 	log.Printf("start %s\n", container.ID)
 	checkErr(err)
-}
 
-func testDocker() {
-	client, err := docker.NewClientFromEnv()
-	if err != nil {
-		panic(err)
-	}
-	imgs, err := client.ListImages(docker.ListImagesOptions{All: true})
-	if err != nil {
-		panic(err)
-	}
-	for _, img := range imgs {
-		fmt.Println("ID: ", img.ID)
-		fmt.Println("RepoTags: ", img.RepoTags)
-		fmt.Println("Created: ", img.Created)
-		fmt.Println("Size: ", img.Size)
-		fmt.Println("VirtualSize: ", img.VirtualSize)
-		fmt.Println("ParentId: ", img.ParentID)
-		fmt.Println("====================================")
-	}
+	//端口映射
+	ctnOut, err := dockerClient.InspectContainerWithOptions(docker.InspectContainerOptions{
+		ID: container.ID,
+	})
+	mappedPort := ctnOut.NetworkSettings.Ports["8800/tcp"][0].HostPort
+	fmt.Fprintf(w, "{\"ok\":true,\"id\":\"%s\",\"port\":\"%s\"}", container.ID, mappedPort)
 }
 
 func getQueryParam(r *http.Request, queryKey string) string {
