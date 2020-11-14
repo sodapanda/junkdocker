@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -14,20 +15,28 @@ import (
 )
 
 var db *sql.DB
+var dockerClient *docker.Client
 
 func main() {
+	//连接数据库
 	var err error
 	db, err = sql.Open("sqlite3", "./junk.db")
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkErr(err)
 	defer db.Close()
 
+	//连接docker
+	if dockerClient == nil {
+		dockerClient, err = docker.NewClientFromEnv()
+		checkErr(err)
+	}
+
+	//启动http服务器
 	httpServer()
 }
 
 func httpServer() {
 	http.HandleFunc("/bandwidthReport", ReportBandWidth)
+	http.HandleFunc("/start", StartContainer)
 	http.ListenAndServe(":1030", nil)
 }
 
@@ -37,11 +46,38 @@ func ReportBandWidth(w http.ResponseWriter, r *http.Request) {
 	txBytesStr := getQueryParam(r, "txbytes")
 	timeStamp := time.Now().Unix()
 	txBytes, err := strconv.Atoi(txBytesStr)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkErr(err)
 
 	writeDBBandwidth(cid, timeStamp, txBytes)
+}
+
+//StartContainer start
+func StartContainer(w http.ResponseWriter, r *http.Request) {
+	//user id
+	uid := getQueryParam(r, "uid")
+	//目的ip:port
+	dst := getQueryParam(r, "dst")
+
+	//container名称
+	ctnrName := fmt.Sprintf("%s_%s", uid, strings.Replace(dst, ":", "_", -1))
+
+	container, err := dockerClient.CreateContainer(docker.CreateContainerOptions{
+		Name: ctnrName,
+		Config: &docker.Config{
+			Image:      "sodapanda/portforward:0.0.1",
+			Entrypoint: []string{"./entrypoint.sh", dst, uid},
+		},
+		HostConfig: &docker.HostConfig{
+			PublishAllPorts: true,
+			CapAdd:          []string{"NET_ADMIN"},
+		},
+	})
+	checkErr(err)
+	log.Printf("created %s %s\n", container.Name, container.ID)
+
+	err = dockerClient.StartContainer(container.ID, nil)
+	log.Printf("start %s\n", container.ID)
+	checkErr(err)
 }
 
 func testDocker() {
@@ -73,6 +109,12 @@ func writeDBBandwidth(containerID string, timeStamp int64, txBytes int) {
 		containerID, timeStamp, txBytes)
 	fmt.Println(sqlStmt)
 	_, err := db.Exec(sqlStmt)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func checkErr(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,1 +1,1 @@
-sudo docker run -P --rm -it --name sodapanda_124.160.173.72_8866 --cap-add NET_ADMIN sodapanda/portforward:0.0.1 124.160.173.72:8866 user10086
+sudo docker run -P --rm -it --name sodapanda_124.160.173.72_8866 --cap-add NET_ADMIN sodapanda/portforward:0.0.1 124.160.173.72:8866 sodapanda
