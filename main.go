@@ -35,8 +35,12 @@ func main() {
 }
 
 func httpServer() {
+	//各个容器每10秒上报一次流量(这10秒内的流量)
 	http.HandleFunc("/bandwidthReport", ReportBandWidth)
+	//启动一个容器的接口
 	http.HandleFunc("/start", StartContainer)
+	//获取数据量
+	http.HandleFunc("/getTxBytes", GetBytesInTime)
 	http.ListenAndServe(":1030", nil)
 }
 
@@ -88,6 +92,32 @@ func StartContainer(w http.ResponseWriter, r *http.Request) {
 	})
 	mappedPort := ctnOut.NetworkSettings.Ports["8800/tcp"][0].HostPort
 	fmt.Fprintf(w, "{\"ok\":true,\"id\":\"%s\",\"port\":\"%s\"}", container.ID, mappedPort)
+}
+
+//GetBytesInTime 获取一段时间内的流量
+func GetBytesInTime(w http.ResponseWriter, r *http.Request) {
+	cid := getQueryParam(r, "cid")
+	startTs, err := strconv.Atoi(getQueryParam(r, "start"))
+	checkErr(err)
+	endTs, err := strconv.Atoi(getQueryParam(r, "end"))
+	checkErr(err)
+
+	sqlStmt := fmt.Sprintf("select * from bandwidth where ContainerID='%s' and Timestamp > %d and Timestamp < %d", cid, startTs, endTs)
+	rows, err := db.Query(sqlStmt)
+
+	total := 0
+	for rows.Next() {
+		var cid string
+		var timestamp int
+		var txBytes int
+
+		err = rows.Scan(&cid, &timestamp, &txBytes)
+		checkErr(err)
+		total = total + txBytes
+	}
+	defer rows.Close()
+
+	fmt.Fprintf(w, "{\"cid\":\"%s\",\"start\":\"%d\",\"end\":\"%d\",\"txBytes\":\"%d\"}", cid, startTs, endTs, total)
 }
 
 func getQueryParam(r *http.Request, queryKey string) string {
